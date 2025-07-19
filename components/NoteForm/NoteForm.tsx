@@ -1,47 +1,60 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { NewNoteData } from "../../types/note";
-import { createNote } from "../../lib/api";
-import { Formik, Form, Field, ErrorMessage } from "formik";
-import * as Yup from "yup";
+import { ErrorMessage, Field, Form, Formik, type FormikHelpers } from "formik";
 import css from "./NoteForm.module.css";
+import * as Yup from "yup";
+import type { CreateNoteValues } from "../../types/note";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { createNote } from "../../lib/api";
+import toast, { Toaster } from "react-hot-toast";
 
-interface NoteFormProps {
-  onSuccess: () => void;
+const validationSchema = Yup.object().shape({
+  title: Yup.string()
+    .min(3, "To short!")
+    .max(50, "To long!")
+    .required("Title is required!"),
+  content: Yup.string().max(500),
+  tag: Yup.string()
+    .oneOf(["Work", "Personal", "Meeting", "Shopping", "Todo"])
+    .required("Tag is required!"),
+});
+
+const initialValues: CreateNoteValues = {
+  title: "",
+  content: "",
+  tag: "Todo",
+};
+
+export interface NoteFormProps {
   onClose: () => void;
 }
 
-export default function NoteForm({ onSuccess, onClose }: NoteFormProps) {
+export default function NoteForm({ onClose }: NoteFormProps) {
   const queryClient = useQueryClient();
-
-  const { mutate } = useMutation({
-    mutationFn: (noteData: NewNoteData) => createNote(noteData),
+  const mutationCreate = useMutation({
+    mutationFn: createNote,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notes"] });
-      onSuccess();
+      onClose();
+      toast.success("Success! Your note has been saved.");
+    },
+    onError: () => {
+      toast.error("Oops! The note couldn't be saved.");
     },
   });
 
-  const NoteSchema = Yup.object().shape({
-    title: Yup.string()
-      .min(3, "Must be at least 3 characters")
-      .max(50, "Must be at most 50 characters")
-      .required("Title is required"),
-    content: Yup.string().max(500, "Must be at most 500 characters"),
-    tag: Yup.string()
-      .oneOf(["Todo", "Work", "Personal", "Meeting", "Shopping"])
-      .required("Tag is required"),
-  });
-
+  function handleSubmit(
+    values: CreateNoteValues,
+    actions: FormikHelpers<CreateNoteValues>
+  ) {
+    mutationCreate.mutate(values);
+    actions.resetForm();
+  }
   return (
-    <Formik
-      initialValues={{ title: "", content: "", tag: "Todo" }}
-      validationSchema={NoteSchema}
-      onSubmit={(values, actions) => {
-        mutate(values);
-        actions.resetForm();
-      }}
-    >
-      {({ isSubmitting }) => (
+    <>
+      <Formik
+        initialValues={initialValues}
+        onSubmit={handleSubmit}
+        validationSchema={validationSchema}
+      >
         <Form className={css.form}>
           <div className={css.formGroup}>
             <label htmlFor="title">Title</label>
@@ -55,7 +68,7 @@ export default function NoteForm({ onSuccess, onClose }: NoteFormProps) {
               as="textarea"
               id="content"
               name="content"
-              rows="8"
+              rows={8}
               className={css.textarea}
             />
             <ErrorMessage
@@ -85,16 +98,27 @@ export default function NoteForm({ onSuccess, onClose }: NoteFormProps) {
             >
               Cancel
             </button>
-            <button
-              type="submit"
-              className={css.submitButton}
-              disabled={isSubmitting}
-            >
-              Create note
-            </button>
+            {mutationCreate.isPending ? (
+              <button
+                type="submit"
+                className={css.submitButton}
+                disabled={true}
+              >
+                Note creation...
+              </button>
+            ) : (
+              <button
+                type="submit"
+                className={css.submitButton}
+                disabled={false}
+              >
+                Create note
+              </button>
+            )}
           </div>
         </Form>
-      )}
-    </Formik>
+      </Formik>
+      <Toaster />
+    </>
   );
 }

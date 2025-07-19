@@ -2,15 +2,15 @@ export interface Note {
   id: number;
   title: string;
   content: string;
+  tag: Tag;
   createdAt: string;
   updatedAt: string;
-  tag: string;
 }
 
-export interface NewNoteData {
+export interface CreateNoteValues {
   title: string;
-  content: string;
-  tag: string;
+  content?: string;
+  tag: Tag;
 }
 
 type Tag = "Work" | "Personal" | "Meeting" | "Shopping" | "Todo";
